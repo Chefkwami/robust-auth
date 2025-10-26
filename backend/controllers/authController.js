@@ -141,7 +141,7 @@ export const getAllUsers = async(req, res) => {
     } catch (error) {
         return res.status(500).json({
             success: false,
-            message: error.message
+            message: error.message,
         });
     }
 };
@@ -164,10 +164,9 @@ export const deleteUser = async(req, res) => {
             });
         }
     } catch (error) {
-
         return res.status(500).json({
             success: false,
-            message: error.message
+            message: error.message,
         });
     }
 };
@@ -213,7 +212,7 @@ export const sendVeriftyOtp = async(req, res) => {
     } catch (error) {
         return res.status(500).json({
             success: false,
-            message: error.message
+            message: error.message,
         });
     }
 };
@@ -261,7 +260,112 @@ export const verifyEmail = async(req, res) => {
     } catch (error) {
         return res.status(500).json({
             success: false,
-            message: error.message
-        })
+            message: error.message,
+        });
     }
 };
+
+export const sendResetOtp = async(req, res) => {
+    const { email } = req.body;
+    if (!email) {
+        return res.status(400).json({
+            success: false,
+            message: "Email is required",
+        });
+    }
+
+    try {
+        const theUser = await User.findOne({ email });
+        if (!theUser) {
+            return res.status(404).json({
+                success: false,
+                message: "User no found",
+            });
+        }
+
+        const otp = String(Math.floor(Math.random() * 900000 + 100000));
+        theUser.resetOtp = otp;
+
+        theUser.resetOtpExpiresAt = Date.now() + 15 * 60 * 1000;
+
+        const mailOptions = {
+            from: process.env.SENDER_EMAIL,
+            to: theUser.email,
+            subject: "RESET OTP VERIFICATION",
+            text: `Here is your ${otp} to reset your password`,
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        await theUser.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "OTP sent successfully",
+        });
+    } catch (error) {
+        return res.status(500).json({
+            succcess: false,
+            message: error.message,
+        });
+    }
+};
+
+
+export const resetPassword = async(req, res) => {
+    const { email, otp, newPassword } = req.body
+    if (!otp || !newPassword || !email) {
+        return res.status(401).json({
+            success: false,
+            message: "Missing fields"
+        });
+    }
+    try {
+
+        const theUser = await User.findOne({ email })
+        if (!theUser) {
+            return res.status(404).json({
+                success: false,
+                message: "Invalid email"
+            });
+
+        }
+
+        if (theUser.otp === "" || theUser.resetOtp !== otp) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid Otp"
+            });
+
+        }
+
+        if (theUser.resetOtpExpiresAt < Date.now()) {
+            return res.status(400).json({
+                success: false,
+                message: "Otp expired"
+            });
+
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10)
+        theUser.password = hashedPassword;
+        theUser.resetOtp = "";
+        theUser.resetOtpExpiresAt = 0;
+        await theUser.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Password successfully changed"
+        })
+
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        })
+
+    }
+
+
+}

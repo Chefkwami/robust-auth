@@ -38,11 +38,11 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
-    resetOpt: {
+    resetOtp: {
         type: String,
         default: "",
     },
-    resetOptExpiresAt: {
+    resetOtpExpiresAt: {
         type: Number,
         default: 0,
     },
